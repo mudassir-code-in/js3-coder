@@ -20,17 +20,18 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         icons: [
-            { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-            { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-            { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/sitemap\.xml$/, /^\/robots\.txt$/],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
         runtimeCaching: [
           {
-          
+
             urlPattern: /^https:\/\/img\.youtube\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
