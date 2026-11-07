@@ -1,8 +1,10 @@
 import React from 'react';
+import Courses from './CourseComponent';
+import { Link } from 'react-router-dom';
 
 const Header = () => {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-indigo-500/20 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/90 backdrop-blur-md shadow-lg shadow-indigo-950/40">
+    <header className="w-full border-b border-indigo-950 bg-gradient-to-r from-slate-900 backdrop-blur-md shadow-lg shadow-indigo-950/40">
       <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-3.5 sm:px-6">
         
         {/* Left: Rich Multi-Tone Logo & Title */}
@@ -30,7 +32,9 @@ const Header = () => {
         </a>
 
         {/* Right: Clean Space */}
-        <div></div>
+        <div>
+          <Link to='/courses' className='bg-cyan-400 px-3 py-1 flex justify-center items-center rounded-xl'>Courses</Link>
+        </div>
 
       </div>
     </header>
