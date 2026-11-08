@@ -23,7 +23,6 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const [screenKeyboard, setScreenKeyboard] = useState(true);
   const screenKeyboardRef = useRef(true);
 
-  
   const [vh, setVh] = useState(null);
 
   const editable = isEditable(activeFile);
@@ -53,7 +52,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     applyKeyboardMode(next, true);
   };
 
-  
+
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -72,7 +71,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     };
   }, []);
 
- 
+  
   useEffect(() => {
     const handleMessage = (event) => {
       if (
@@ -98,7 +97,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  
+  // Pending suggest timer cleanup
   useEffect(() => {
     return () => clearTimeout(suggestTimerRef.current);
   }, []);
@@ -115,20 +114,12 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
       const change = e.changes[0];
       if (!change || e.isFlush) return;
 
-  
+ 
       if (change.text.length === 1 && /[\w<\/\-.:="' ]/.test(change.text)) {
         clearTimeout(suggestTimerRef.current);
         suggestTimerRef.current = setTimeout(() => {
-          let widgetOpen = false;
-          try {
-            widgetOpen = !!editor._contextKeyService?.getContextKeyValue('suggestWidgetVisible');
-          } catch (err) {
-            widgetOpen = false;
-          }
-          if (!widgetOpen) {
-            editor.trigger('auto', 'editor.action.triggerSuggest', {});
-          }
-        }, 10);
+          editor.trigger('auto', 'editor.action.triggerSuggest', {});
+        }, 20);
       }
     });
   };
@@ -233,7 +224,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   tabSize: 2,
                   automaticLayout: true,
                   scrollBeyondLastLine: false,
-                 
+                
                   editContext: true,
 
                   quickSuggestions: { other: true, comments: false, strings: true },
