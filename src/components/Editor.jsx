@@ -147,7 +147,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   tabSize: 2,
                   automaticLayout: true,
                   scrollBeyondLastLine: false,
-                  editContext: false,
+                  editContext: true,
 
                  
                   autoClosingBrackets: 'never',
