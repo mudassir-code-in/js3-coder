@@ -14,6 +14,7 @@ const keepFocus = (e) => e.preventDefault();
 export default function Editor({ activeFile, files, onCodeChange, toggleSidebar }) {
   const editorRef = useRef(null);
   const iframeRef = useRef(null);
+  const suggestTimerRef = useRef(null);
 
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState('preview');
@@ -21,6 +22,9 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
   const [screenKeyboard, setScreenKeyboard] = useState(true);
   const screenKeyboardRef = useRef(true);
+
+ 
+  const [vh, setVh] = useState(null);
 
   const editable = isEditable(activeFile);
   const kind = getKind(activeFile);
@@ -49,6 +53,25 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     applyKeyboardMode(next, true);
   };
 
+ 
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      setVh(Math.round(vv.height));
+      window.scrollTo(0, 0);
+    };
+
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   // Preview frame ke console messages sunna
   useEffect(() => {
     const handleMessage = (event) => {
@@ -75,6 +98,11 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+ 
+  useEffect(() => {
+    return () => clearTimeout(suggestTimerRef.current);
+  }, []);
+
   const handleBeforeMount = (monaco) => {
     setupHtmlCompletions(monaco);
   };
@@ -86,9 +114,14 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     editor.onDidChangeModelContent((e) => {
       const change = e.changes[0];
       if (!change || e.isFlush) return;
-      // Sirf single char typing par (paste / enter par nahi)
-      if (change.text.length === 1 && /[\w<\/\-.:="' ]/.test(change.text)) {
-        setTimeout(() => editor.trigger('auto', 'editor.action.triggerSuggest', {}), 0);
+
+      // Letters par Monaco ka quickSuggestions khud suggest kholta hai.
+      // Sirf special chars par manual trigger, debounce ke saath (widget restart/flicker nahi hoga).
+      if (change.text.length === 1 && /[<\/\-.:="' ]/.test(change.text)) {
+        clearTimeout(suggestTimerRef.current);
+        suggestTimerRef.current = setTimeout(() => {
+          editor.trigger('auto', 'editor.action.triggerSuggest', {});
+        }, 30);
       }
     });
   };
@@ -132,7 +165,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
   return (
     <>
-      <div className="flex h-full w-full flex-col bg-slate-950 overflow-hidden relative">
+      <div
+        className="flex w-full flex-col bg-slate-950 overflow-hidden relative"
+        style={{ height: vh ? `${vh}px` : '100%' }}
+      >
         <Header />
 
         {/* TOP BAR */}
@@ -190,6 +226,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   tabSize: 2,
                   automaticLayout: true,
                   scrollBeyondLastLine: false,
+                  
                   editContext: true,
 
                   quickSuggestions: { other: true, comments: false, strings: true },
