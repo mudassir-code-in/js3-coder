@@ -225,7 +225,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   automaticLayout: true,
                   scrollBeyondLastLine: false,
                 
-                  editContext: true,
+                  editContext: false,
 
                   quickSuggestions: { other: true, comments: false, strings: true },
                   quickSuggestionsDelay: 0,
