@@ -64,7 +64,7 @@ const VideoPlayer = ({ url, title }) => {
     if (e.data === 2) stopTracking();
     if (e.data === 0) {
       clearInterval(intervalRef.current);
-      saveTime(videoId, 0); // video khatam, dobara start se
+      saveTime(videoId, 0); 
     }
   };
 
