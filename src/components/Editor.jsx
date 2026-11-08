@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import FileViewer from './FileViewer';
-import useHardwareKeyboard from '../hooks/useHardwareKeyboard';
 import { getLanguage, getKind, isEditable } from '../utils/templates';
 import { compilePreview } from '../utils/compilePreview';
 import Header from './Header';
@@ -18,10 +17,31 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const [activeTab, setActiveTab] = useState('preview');
   const [logs, setLogs] = useState([]);
 
-  const { screenKeyboard, toggleScreenKeyboard, attachEditor } = useHardwareKeyboard();
+  const [screenKeyboard, setScreenKeyboard] = useState(true);
+  const screenKeyboardRef = useRef(true);
 
   const editable = isEditable(activeFile);
   const kind = getKind(activeFile);
+
+  const getInputEl = () =>
+    editorRef.current?.getDomNode?.()?.querySelector('.native-edit-context, textarea') || null;
+
+  const applyKeyboardMode = (on, refocus) => {
+    const el = getInputEl();
+    if (!el) return;
+    el.setAttribute('inputmode', on ? 'text' : 'none');
+    if (refocus && document.activeElement === el) {
+      el.blur();
+      setTimeout(() => el.focus({ preventScroll: true }), 60);
+    }
+  };
+
+  const toggleScreenKeyboard = () => {
+    const next = !screenKeyboardRef.current;
+    screenKeyboardRef.current = next;
+    setScreenKeyboard(next);
+    applyKeyboardMode(next, true);
+  };
 
   // Listen only to the console messages from your preview frame
   useEffect(() => {
@@ -51,7 +71,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
   const handleEditorDidMount = (editor) => {
     editorRef.current = editor;
-    attachEditor(editor);
+    applyKeyboardMode(screenKeyboardRef.current, false);
   };
 
   const handleUndo = () => {
@@ -89,7 +109,6 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
   return (
     <>
-
       <div className="flex h-full w-full flex-col bg-slate-950 overflow-hidden relative">
         <Header />
 
@@ -149,7 +168,6 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   scrollBeyondLastLine: false,
                   editContext: true,
 
-                 
                   autoClosingBrackets: 'never',
                   autoClosingQuotes: 'never',
                   autoClosingTags: false,
@@ -165,7 +183,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   renderLineHighlight: 'none',
                   occurrencesHighlight: 'off',
                   selectionHighlight: false,
-                  matchBrackets: 'never',
+                  matchBrackets: 'never'
                 }}
               />
             )
@@ -219,10 +237,11 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   onMouseDown={keepFocus}
                   onClick={toggleScreenKeyboard}
                   title={screenKeyboard ? 'Screen keyboard ON' : 'Screen keyboard OFF (physical keyboard)'}
-                  className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${screenKeyboard
+                  className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${
+                    screenKeyboard
                       ? 'bg-slate-800 text-slate-300 border-slate-700'
                       : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
-                    }`}
+                  }`}
                 >
                   ⌨️{screenKeyboard ? '' : '✕'}
                 </button>
@@ -250,16 +269,18 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-md border border-slate-800">
                 <button
                   onClick={() => setActiveTab('preview')}
-                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${activeTab === 'preview' ? 'bg-cyan-500 text-slate-950 shadow' : 'text-slate-400'
-                    }`}
+                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
+                    activeTab === 'preview' ? 'bg-cyan-500 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
                 >
                   🌐 Web
                 </button>
 
                 <button
                   onClick={() => setActiveTab('console')}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${activeTab === 'console' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'
-                    }`}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
+                    activeTab === 'console' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
                 >
                   💻 Console
                   {logs.length > 0 && (
@@ -290,8 +311,9 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               </div>
 
               <div
-                className={`w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-xs flex-col ${activeTab === 'console' ? 'flex' : 'hidden'
-                  }`}
+                className={`w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-xs flex-col ${
+                  activeTab === 'console' ? 'flex' : 'hidden'
+                }`}
               >
                 <div className="flex items-center justify-between px-3 py-1.5 bg-[#252526] border-b border-[#333333] text-[11px] text-[#cccccc]">
                   <span>Live Console ({logs.length})</span>
@@ -310,12 +332,13 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                     logs.map((log) => (
                       <div
                         key={log.id}
-                        className={`flex items-start gap-2 px-2 py-1 border-b border-[#2d2d2d] leading-relaxed break-all ${log.level === 'error'
+                        className={`flex items-start gap-2 px-2 py-1 border-b border-[#2d2d2d] leading-relaxed break-all ${
+                          log.level === 'error'
                             ? 'bg-[#291415] text-[#f87171]'
                             : log.level === 'warn'
                               ? 'bg-[#2a2310] text-[#fbbf24]'
                               : 'text-[#4ec9b0]'
-                          }`}
+                        }`}
                       >
                         <span className="text-[#666666] text-[10px]">{log.time}</span>
                         <pre className="flex-1 whitespace-pre-wrap font-mono text-xs">{log.message}</pre>
