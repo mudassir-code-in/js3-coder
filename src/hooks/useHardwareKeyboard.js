@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 export default function useHardwareKeyboard() {
   const [screenKeyboard, setScreenKeyboard] = useState(true);
-  const [notice, setNotice] = useState('');
 
   const enabledRef = useRef(true);
   const editorRef = useRef(null);
@@ -28,7 +27,6 @@ export default function useHardwareKeyboard() {
   }, []);
 
   const toggleScreenKeyboard = useCallback(() => {
-    setNotice('');
     const next = !enabledRef.current;
     enabledRef.current = next;
     setScreenKeyboard(next);
@@ -37,22 +35,10 @@ export default function useHardwareKeyboard() {
 
   const attachEditor = useCallback((editor) => {
     editorRef.current = editor;
-    enabledRef.current = true;          
+    enabledRef.current = true; 
     setScreenKeyboard(true);
     applyMode(true, false);
   }, [applyMode]);
 
-  useEffect(() => {
-    if (!notice) return;
-    const t = setTimeout(() => setNotice(''), 4000);
-    return () => clearTimeout(t);
-  }, [notice]);
-
-  return {
-    screenKeyboard,
-    toggleScreenKeyboard,
-    attachEditor,
-    notice,
-    dismissNotice: () => setNotice(''),
-  };
+  return { screenKeyboard, toggleScreenKeyboard, attachEditor };
 }
