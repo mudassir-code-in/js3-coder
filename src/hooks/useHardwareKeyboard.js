@@ -33,12 +33,22 @@ export default function useHardwareKeyboard() {
     applyMode(next, true);
   }, [applyMode]);
 
-  const attachEditor = useCallback((editor) => {
-    editorRef.current = editor;
-    enabledRef.current = true; 
-    setScreenKeyboard(true);
-    applyMode(true, false);
-  }, [applyMode]);
+ const attachEditor = useCallback((editor) => {
+  editorRef.current = editor;
+  enabledRef.current = true;
+  setScreenKeyboard(true);
+  applyMode(true, false);
+
+  const ta = editor.getDomNode?.()?.querySelector('textarea');
+  if (ta) {
+    ta.setAttribute('autocomplete', 'off');
+    ta.setAttribute('autocorrect', 'off');
+    ta.setAttribute('autocapitalize', 'off');
+    ta.setAttribute('spellcheck', 'false');
+    ta.setAttribute('data-gramm', 'false');
+    ta.setAttribute('enterkeyhint', 'enter');
+  }
+}, [applyMode]);
 
   return { screenKeyboard, toggleScreenKeyboard, attachEditor };
 }
