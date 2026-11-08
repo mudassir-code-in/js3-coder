@@ -20,7 +20,7 @@ const getSavedTime = (id) => {
 const saveTime = (id, time) => {
   try {
     localStorage.setItem(`yt-progress-${id}`, String(Math.floor(time)));
-  } catch {}
+  } catch { }
 };
 
 // Ek video card ka player (thumbnail pehle, click pe player)
@@ -64,7 +64,7 @@ const VideoPlayer = ({ url, title }) => {
     if (e.data === 2) stopTracking();
     if (e.data === 0) {
       clearInterval(intervalRef.current);
-      saveTime(videoId, 0); 
+      saveTime(videoId, 0);
     }
   };
 
@@ -152,7 +152,13 @@ const Courses = () => {
         <h2 className="text-lg text-[#569cd6] font-semibold tracking-wide">
           {"// Learn here"}
         </h2>
-        <Link to='/' className='bg-slate-900 text-white px-2 py-1 rounded-xl'>🔙 Back</Link>
+        <Link
+          to='/'
+          className='group inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-200 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl transition-all duration-300 ease-in-out hover:text-white hover:border-slate-500 shadow-sm hover:shadow-md hover:shadow-slate-900/50 active:scale-95'
+        >
+          <span className='transition-transform duration-300 group-hover:-translate-x-1'>&larr;</span>
+          <span>Back</span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

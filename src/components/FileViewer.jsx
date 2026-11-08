@@ -69,11 +69,11 @@ function BlobViewer({ file, kind }) {
           )}
           {shareFile && (
             <button onClick={handleShare} className={btn}>
-              📤 Share
+              Share
             </button>
           )}
           <button onClick={handleDownload} className={btn}>
-            ⬇ Save
+             Save
           </button>
         </div>
       </div>
