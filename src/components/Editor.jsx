@@ -19,8 +19,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const [activeTab, setActiveTab] = useState('preview');
   const [logs, setLogs] = useState([]);
 
-  const { screenKeyboard, toggleScreenKeyboard, attachEditor, notice, dismissNotice } =
-    useHardwareKeyboard();
+ const { screenKeyboard, toggleScreenKeyboard, attachEditor } = useHardwareKeyboard();
 
   const editable = isEditable(activeFile);
   const kind = getKind(activeFile);
@@ -160,22 +159,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               />
             )
           )}
-
-          {/* Keyboard notice */}
-          {notice && (
-            <div className="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs text-white shadow-lg">
-              <span>{notice}</span>
-              <button
-                onClick={() => {
-                  dismissNotice();
-                  toggleScreenKeyboard();
-                }}
-                className="flex-shrink-0 rounded bg-black/25 px-2 py-1 font-bold"
-              >
-                on
-              </button>
-            </div>
-          )}
+          
         </div>
 
         {/* BOTTOM BAR */}
