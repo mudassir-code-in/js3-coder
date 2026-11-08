@@ -1,4 +1,4 @@
-export const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_BYTES = 150 * 1024 * 1024; // 150 MB
 
 export const readAsDataURL = (file) =>
   new Promise((resolve, reject) => {
