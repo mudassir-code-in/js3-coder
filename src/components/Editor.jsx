@@ -3,10 +3,11 @@ import MonacoEditor from '@monaco-editor/react';
 import FileViewer from './FileViewer';
 import { getLanguage, getKind, isEditable } from '../utils/templates';
 import { compilePreview } from '../utils/compilePreview';
+import { setupHtmlCompletions } from '../utils/htmlCompletions';
 import Header from './Header';
 
-const SYMBOLS = ['<', '>', '/', '=', '"', "'", '{', '}', '(', ')', '[', ']', ';', ':'];
-const TRIGGER_CHARS = ['<', '/', '.', '"', "'", ':', '='];
+const SYMBOLS = ['<', '>', '/', '=', '"', "'", '-', '{', '}', '(', ')', '[', ']', ';', ':'];
+const TRIGGER_CHARS = ['<', '/', '.', '-', '"', "'", ':', '='];
 
 const keepFocus = (e) => e.preventDefault();
 
@@ -31,6 +32,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     const el = getInputEl();
     if (!el) return;
     el.setAttribute('inputmode', on ? 'text' : 'none');
+    el.setAttribute('autocorrect', 'off');
+    el.setAttribute('autocapitalize', 'off');
+    el.setAttribute('autocomplete', 'off');
+    el.setAttribute('spellcheck', 'false');
     if (refocus && document.activeElement === el) {
       el.blur();
       setTimeout(() => el.focus({ preventScroll: true }), 60);
@@ -44,7 +49,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     applyKeyboardMode(next, true);
   };
 
-  // Listen only to the console messages from your preview frame
+  // Preview frame ke console messages sunna
   useEffect(() => {
     const handleMessage = (event) => {
       if (
@@ -70,6 +75,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  const handleBeforeMount = (monaco) => {
+    setupHtmlCompletions(monaco);
+  };
+
   const handleEditorDidMount = (editor) => {
     editorRef.current = editor;
     applyKeyboardMode(screenKeyboardRef.current, false);
@@ -77,8 +86,9 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     editor.onDidChangeModelContent((e) => {
       const change = e.changes[0];
       if (!change || e.isFlush) return;
-      if (change.text === '<' || change.text === '/') {
-        setTimeout(() => editor.trigger('auto', 'editor.action.triggerSuggest', {}), 50);
+      // Sirf single char typing par (paste / enter par nahi)
+      if (change.text.length === 1 && /[\w<\/\-.:="' ]/.test(change.text)) {
+        setTimeout(() => editor.trigger('auto', 'editor.action.triggerSuggest', {}), 0);
       }
     });
   };
@@ -108,7 +118,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     editor.focus();
 
     if (TRIGGER_CHARS.includes(text)) {
-      setTimeout(() => editor.trigger('quick-bar', 'editor.action.triggerSuggest', {}), 50);
+      setTimeout(() => editor.trigger('quick-bar', 'editor.action.triggerSuggest', {}), 0);
     }
   };
 
@@ -162,6 +172,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                 language={getLanguage(activeFile.name)}
                 defaultValue={activeFile.content}
                 theme="vs-dark"
+                beforeMount={handleBeforeMount}
                 onMount={handleEditorDidMount}
                 onChange={(val) => onCodeChange(val ?? '')}
                 loading={
@@ -182,9 +193,18 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   editContext: true,
 
                   quickSuggestions: { other: true, comments: false, strings: true },
+                  quickSuggestionsDelay: 0,
                   suggestOnTriggerCharacters: true,
-                  acceptSuggestionOnEnter: 'smart',
-                  wordBasedSuggestions: 'currentDocument',
+                  acceptSuggestionOnEnter: 'on',
+                  acceptSuggestionOnCommitCharacter: false,
+                  tabCompletion: 'on',
+                  suggestSelection: 'first',
+                  wordBasedSuggestions: 'off',
+                  suggest: {
+                    showWords: false,
+                    preview: false,
+                    snippetsPreventQuickSuggestions: false
+                  },
                   parameterHints: { enabled: true },
 
                   autoClosingBrackets: 'always',
@@ -192,7 +212,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   autoClosingTags: true,
                   autoIndent: 'full',
                   formatOnPaste: true,
-                  formatOnType: true,
+                  formatOnType: false,
 
                   renderWhitespace: 'none',
                   renderLineHighlight: 'none',
