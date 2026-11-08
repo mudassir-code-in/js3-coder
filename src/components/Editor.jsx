@@ -6,6 +6,7 @@ import { compilePreview } from '../utils/compilePreview';
 import Header from './Header';
 
 const SYMBOLS = ['<', '>', '/', '=', '"', "'", '{', '}', '(', ')', '[', ']', ';', ':'];
+const TRIGGER_CHARS = ['<', '/', '.', '"', "'", ':', '='];
 
 const keepFocus = (e) => e.preventDefault();
 
@@ -72,6 +73,14 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const handleEditorDidMount = (editor) => {
     editorRef.current = editor;
     applyKeyboardMode(screenKeyboardRef.current, false);
+
+    editor.onDidChangeModelContent((e) => {
+      const change = e.changes[0];
+      if (!change || e.isFlush) return;
+      if (change.text === '<' || change.text === '/') {
+        setTimeout(() => editor.trigger('auto', 'editor.action.triggerSuggest', {}), 50);
+      }
+    });
   };
 
   const handleUndo = () => {
@@ -97,6 +106,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
     editor.executeEdits('quick-bar', [{ range: selection, text, forceMoveMarkers: true }]);
     editor.focus();
+
+    if (TRIGGER_CHARS.includes(text)) {
+      setTimeout(() => editor.trigger('quick-bar', 'editor.action.triggerSuggest', {}), 50);
+    }
   };
 
   const openPanel = (tab) => {
@@ -168,7 +181,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   scrollBeyondLastLine: false,
                   editContext: true,
 
-                  quickSuggestions: true,
+                  quickSuggestions: { other: true, comments: false, strings: true },
                   suggestOnTriggerCharacters: true,
                   acceptSuggestionOnEnter: 'smart',
                   wordBasedSuggestions: 'currentDocument',
