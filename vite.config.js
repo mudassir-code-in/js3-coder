@@ -12,7 +12,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
         name: 'JS3 Coder',
-        short_name: 'JS3',
+        short_name: 'JS3 Coder',
         description: 'Learn coding',
         theme_color: '#1e1e1e',
         background_color: '#1e1e1e',
