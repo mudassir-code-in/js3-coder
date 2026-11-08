@@ -8,7 +8,6 @@ import Header from './Header';
 
 const SYMBOLS = ['<', '>', '/', '=', '"', "'", '{', '}', '(', ')', '[', ']', ';', ':'];
 
-
 const keepFocus = (e) => e.preventDefault();
 
 export default function Editor({ activeFile, files, onCodeChange, toggleSidebar }) {
@@ -19,8 +18,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const [activeTab, setActiveTab] = useState('preview');
   const [logs, setLogs] = useState([]);
 
-  const { screenKeyboard, toggleScreenKeyboard, attachEditor, notice, dismissNotice } =
-    useHardwareKeyboard();
+  const { screenKeyboard, toggleScreenKeyboard, attachEditor } = useHardwareKeyboard();
 
   const editable = isEditable(activeFile);
   const kind = getKind(activeFile);
@@ -91,11 +89,12 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
   return (
     <>
-
-      <div className="flex h-full w-full flex-col bg-slate-950 overflow-hidden select-none relative">
+      
+      <div className="flex h-full w-full flex-col bg-slate-950 overflow-hidden relative">
         <Header />
+
         {/* TOP BAR */}
-        <div className="flex h-8 w-full flex-shrink-0 items-center justify-between gap-2 px-2 border-b border-slate-800 bg-slate-900/90 z-20">
+        <div className="flex h-8 w-full flex-shrink-0 items-center justify-between gap-2 px-2 border-b border-slate-800 bg-slate-900/90 z-20 select-none">
           <div className="flex items-center min-w-0 gap-2">
             <button
               onClick={toggleSidebar}
@@ -114,7 +113,6 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
             onClick={() => openPanel('preview')}
             className="flex h-7 items-center px-1 mx-2 rounded bg-green-400 text-slate-950 font-mono text-xs font-bold active:scale-95"
           >
-
             <span>RUN 🕹️</span>
           </button>
         </div>
@@ -130,7 +128,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                 height="100%"
                 width="100%"
                 language={getLanguage(activeFile.name)}
-                value={activeFile.content}
+                defaultValue={activeFile.content}
                 theme="vs-dark"
                 onMount={handleEditorDidMount}
                 onChange={(val) => onCodeChange(val ?? '')}
@@ -148,39 +146,30 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   folding: true,
                   tabSize: 2,
                   automaticLayout: true,
-                  autoClosingBrackets: 'always',
-                  autoClosingQuotes: 'always',
-                  autoClosingTags: true,
-                  formatOnPaste: true,
-                  formatOnType: true,
-                  quickSuggestions: true,
                   scrollBeyondLastLine: false,
-                  editContext: false
+                  editContext: false,
+
+                  // mobile-friendly: keyboard (Gboard/iOS) 
+                  autoClosingBrackets: 'never',
+                  autoClosingQuotes: 'never',
+                  autoClosingTags: false,
+                  formatOnPaste: false,
+                  formatOnType: false,
+                  quickSuggestions: false,
+                  suggestOnTriggerCharacters: false,
+                  acceptSuggestionOnEnter: 'off',
+                  wordBasedSuggestions: 'off',
+                  parameterHints: { enabled: false },
+                  autoIndent: 'none'
                 }}
               />
             )
-          )}
-
-          {/* Keyboard notice */}
-          {notice && (
-            <div className="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs text-white shadow-lg">
-              <span>{notice}</span>
-              <button
-                onClick={() => {
-                  dismissNotice();
-                  toggleScreenKeyboard();
-                }}
-                className="flex-shrink-0 rounded bg-black/25 px-2 py-1 font-bold"
-              >
-                on
-              </button>
-            </div>
           )}
         </div>
 
         {/* BOTTOM BAR */}
         <div
-          className="flex min-h-[56px] w-full flex-shrink-0 items-center justify-between gap-2 border-t border-slate-800 bg-slate-900 px-3"
+          className="flex min-h-[56px] w-full flex-shrink-0 items-center justify-between gap-2 border-t border-slate-800 bg-slate-900 px-3 select-none"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 py-1">
@@ -225,10 +214,11 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   onMouseDown={keepFocus}
                   onClick={toggleScreenKeyboard}
                   title={screenKeyboard ? 'Screen keyboard ON' : 'Screen keyboard OFF (physical keyboard)'}
-                  className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${screenKeyboard
-                    ? 'bg-slate-800 text-slate-300 border-slate-700'
-                    : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
-                    }`}
+                  className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${
+                    screenKeyboard
+                      ? 'bg-slate-800 text-slate-300 border-slate-700'
+                      : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
+                  }`}
                 >
                   ⌨️{screenKeyboard ? '' : '✕'}
                 </button>
@@ -256,16 +246,18 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-md border border-slate-800">
                 <button
                   onClick={() => setActiveTab('preview')}
-                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${activeTab === 'preview' ? 'bg-cyan-500 text-slate-950 shadow' : 'text-slate-400'
-                    }`}
+                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
+                    activeTab === 'preview' ? 'bg-cyan-500 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
                 >
                   🌐 Web
                 </button>
 
                 <button
                   onClick={() => setActiveTab('console')}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${activeTab === 'console' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'
-                    }`}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
+                    activeTab === 'console' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
                 >
                   💻 Console
                   {logs.length > 0 && (
@@ -296,8 +288,9 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               </div>
 
               <div
-                className={`w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-xs flex-col ${activeTab === 'console' ? 'flex' : 'hidden'
-                  }`}
+                className={`w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono text-xs flex-col ${
+                  activeTab === 'console' ? 'flex' : 'hidden'
+                }`}
               >
                 <div className="flex items-center justify-between px-3 py-1.5 bg-[#252526] border-b border-[#333333] text-[11px] text-[#cccccc]">
                   <span>Live Console ({logs.length})</span>
@@ -316,12 +309,13 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                     logs.map((log) => (
                       <div
                         key={log.id}
-                        className={`flex items-start gap-2 px-2 py-1 border-b border-[#2d2d2d] leading-relaxed break-all ${log.level === 'error'
-                          ? 'bg-[#291415] text-[#f87171]'
-                          : log.level === 'warn'
-                            ? 'bg-[#2a2310] text-[#fbbf24]'
-                            : 'text-[#4ec9b0]'
-                          }`}
+                        className={`flex items-start gap-2 px-2 py-1 border-b border-[#2d2d2d] leading-relaxed break-all ${
+                          log.level === 'error'
+                            ? 'bg-[#291415] text-[#f87171]'
+                            : log.level === 'warn'
+                              ? 'bg-[#2a2310] text-[#fbbf24]'
+                              : 'text-[#4ec9b0]'
+                        }`}
                       >
                         <span className="text-[#666666] text-[10px]">{log.time}</span>
                         <pre className="flex-1 whitespace-pre-wrap font-mono text-xs">{log.message}</pre>
