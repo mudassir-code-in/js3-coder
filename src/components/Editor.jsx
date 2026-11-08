@@ -96,8 +96,15 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
         <Header />
         {/* TOP BAR */}
         <div className="flex h-8 w-full flex-shrink-0 items-center justify-between gap-2 px-2 border-b border-slate-800 bg-slate-900/90 z-20">
-          <div className="flex items-center min-w-0">
-           
+          <div className="flex items-center min-w-0 gap-2">
+            <button
+              onClick={toggleSidebar}
+              title="Explorer"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-slate-800 text-cyan-400 border border-slate-700 text-sm active:scale-95 sm:hidden"
+            >
+              📂
+            </button>
+
             <span className="text-xs font-mono text-cyan-400 font-semibold truncate">
               {activeFile ? activeFile.path : 'index.html'}
             </span>
@@ -219,8 +226,8 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   onClick={toggleScreenKeyboard}
                   title={screenKeyboard ? 'Screen keyboard ON' : 'Screen keyboard OFF (physical keyboard)'}
                   className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${screenKeyboard
-                      ? 'bg-slate-800 text-slate-300 border-slate-700'
-                      : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
+                    ? 'bg-slate-800 text-slate-300 border-slate-700'
+                    : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
                     }`}
                 >
                   ⌨️{screenKeyboard ? '' : '✕'}
@@ -310,10 +317,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                       <div
                         key={log.id}
                         className={`flex items-start gap-2 px-2 py-1 border-b border-[#2d2d2d] leading-relaxed break-all ${log.level === 'error'
-                            ? 'bg-[#291415] text-[#f87171]'
-                            : log.level === 'warn'
-                              ? 'bg-[#2a2310] text-[#fbbf24]'
-                              : 'text-[#4ec9b0]'
+                          ? 'bg-[#291415] text-[#f87171]'
+                          : log.level === 'warn'
+                            ? 'bg-[#2a2310] text-[#fbbf24]'
+                            : 'text-[#4ec9b0]'
                           }`}
                       >
                         <span className="text-[#666666] text-[10px]">{log.time}</span>
