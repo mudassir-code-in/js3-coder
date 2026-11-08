@@ -9,7 +9,128 @@ import Header from './Header';
 const SYMBOLS = ['<', '>', '/', '=', '"', "'", '-', '{', '}', '(', ')', '[', ']', ';', ':'];
 const TRIGGER_CHARS = ['<', '/', '.', '-', '"', "'", ':', '='];
 
+// Keeps the editor focused (and the keyboard open) when a toolbar button is pressed
 const keepFocus = (e) => e.preventDefault();
+
+/* ---------- Icons (24x24, stroke based) ---------- */
+const Icon = ({ children, className = 'h-5 w-5' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    {children}
+  </svg>
+);
+
+const IconExplorer = ({ className }) => (
+  <Icon className={className}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+  </Icon>
+);
+
+const IconPlay = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className || 'h-4 w-4'} aria-hidden="true">
+    <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
+  </svg>
+);
+
+const IconUndo = ({ className }) => (
+  <Icon className={className}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </Icon>
+);
+
+const IconTrash = ({ className }) => (
+  <Icon className={className}>
+    <path d="M3 6h18" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </Icon>
+);
+
+const IconKeyboard = ({ className, off }) => (
+  <Icon className={className}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
+    {off && <path d="M3 3l18 18" />}
+  </Icon>
+);
+
+const IconTerminal = ({ className }) => (
+  <Icon className={className}>
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
+  </Icon>
+);
+
+const IconGlobe = ({ className }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </Icon>
+);
+
+const IconClose = ({ className }) => (
+  <Icon className={className}>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </Icon>
+);
+
+const IconClear = ({ className }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m4.9 4.9 14.2 14.2" />
+  </Icon>
+);
+
+const IconGrid = ({ className }) => (
+  <Icon className={className}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+  </Icon>
+);
+
+const IconChevronDown = ({ className }) => (
+  <Icon className={className}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+);
+
+/* ---------- Tool tile used inside the slide-up tray ---------- */
+const TONES = {
+  slate: 'bg-slate-800 text-slate-200 border-slate-700',
+  purple: 'bg-purple-600/15 text-purple-300 border-purple-500/40',
+  rose: 'bg-rose-600/15 text-rose-300 border-rose-500/40',
+  emerald: 'bg-emerald-600/15 text-emerald-300 border-emerald-500/40',
+  amber: 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+};
+
+const ToolTile = ({ icon, label, tone = 'slate', badge, onClick }) => (
+  <button
+    onMouseDown={keepFocus}
+    onClick={onClick}
+    className={`relative flex h-16 flex-1 flex-col items-center justify-center gap-1 rounded-lg border text-[11px] font-semibold active:scale-95 transition-transform ${TONES[tone]}`}
+  >
+    {icon}
+    <span className="leading-none">{label}</span>
+    {badge > 0 && (
+      <span className="absolute right-1.5 top-1 rounded-full bg-amber-400 px-1.5 text-[10px] font-bold leading-4 text-slate-950">
+        {badge > 99 ? '99+' : badge}
+      </span>
+    )}
+  </button>
+);
 
 export default function Editor({ activeFile, files, onCodeChange, toggleSidebar }) {
   const editorRef = useRef(null);
@@ -19,6 +140,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState('preview');
   const [logs, setLogs] = useState([]);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const [screenKeyboard, setScreenKeyboard] = useState(true);
   const screenKeyboardRef = useRef(true);
@@ -52,7 +174,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     applyKeyboardMode(next, true);
   };
 
-
+  // Track the visual viewport so the layout shrinks when the on-screen keyboard opens
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -71,7 +193,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     };
   }, []);
 
-  
+  // Collect console logs coming from the preview iframe
   useEffect(() => {
     const handleMessage = (event) => {
       if (
@@ -102,6 +224,11 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     return () => clearTimeout(suggestTimerRef.current);
   }, []);
 
+  // Close the tools tray when another file is opened
+  useEffect(() => {
+    setToolsOpen(false);
+  }, [activeFile?.id]);
+
   const handleBeforeMount = (monaco) => {
     setupHtmlCompletions(monaco);
   };
@@ -114,7 +241,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
       const change = e.changes[0];
       if (!change || e.isFlush) return;
 
- 
+      // Re-trigger suggestions quickly after every typed character
       if (change.text.length === 1 && /[\w<\/\-.:="' ]/.test(change.text)) {
         clearTimeout(suggestTimerRef.current);
         suggestTimerRef.current = setTimeout(() => {
@@ -131,11 +258,16 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     }
   };
 
+  // Clears the file through an edit operation so Undo can bring the code back
   const handleClearCode = () => {
-    if (editorRef.current) {
-      editorRef.current.setValue('');
-      editorRef.current.focus();
-    }
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model) return;
+
+    editor.pushUndoStop();
+    editor.executeEdits('clear', [{ range: model.getFullModelRange(), text: '' }]);
+    editor.pushUndoStop();
+    editor.focus();
   };
 
   const insertTextAtCursor = (text) => {
@@ -159,6 +291,12 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
     setShowPreview(true);
   };
 
+  // Runs a tray action and slides the tray back down
+  const useTool = (fn) => () => {
+    fn();
+    setToolsOpen(false);
+  };
+
   const previewCode = showPreview ? compilePreview(activeFile, files) : '';
 
   return (
@@ -170,14 +308,14 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
         <Header />
 
         {/* TOP BAR */}
-        <div className="flex h-8 w-full flex-shrink-0 items-center justify-between gap-2 px-2 border-b border-slate-800 bg-slate-900/90 z-20 select-none">
+        <div className="flex h-9 w-full flex-shrink-0 items-center justify-between gap-2 px-2 border-b border-slate-800 bg-slate-900/90 z-20 select-none">
           <div className="flex items-center min-w-0 gap-2">
             <button
               onClick={toggleSidebar}
               title="Explorer"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-slate-800 text-cyan-400 border border-slate-700 text-sm active:scale-95 sm:hidden"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-slate-800 text-cyan-400 border border-slate-700 active:scale-95 sm:hidden"
             >
-              📂
+              <IconExplorer className="h-4 w-4" />
             </button>
 
             <span className="text-xs font-mono text-cyan-400 font-semibold truncate">
@@ -187,9 +325,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
           <button
             onClick={() => openPanel('preview')}
-            className="flex h-7 items-center px-1 mx-2 rounded bg-green-400 text-slate-950 font-mono text-xs font-bold active:scale-95"
+            className="flex h-7 flex-shrink-0 items-center gap-1.5 px-3 rounded-md bg-green-400 text-slate-950 font-mono text-xs font-bold tracking-wider active:scale-95 transition-transform"
           >
-            <span>RUN 🕹️</span>
+            <IconPlay />
+            RUN
           </button>
         </div>
 
@@ -224,7 +363,7 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   tabSize: 2,
                   automaticLayout: true,
                   scrollBeyondLastLine: false,
-                
+
                   editContext: true,
 
                   quickSuggestions: { other: true, comments: false, strings: true },
@@ -262,71 +401,83 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
         {/* BOTTOM BAR */}
         <div
-          className="flex min-h-[56px] w-full flex-shrink-0 items-center justify-between gap-2 border-t border-slate-800 bg-slate-900 px-3 select-none"
+          className="relative w-full flex-shrink-0 border-t border-slate-800 bg-slate-900 select-none"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 py-1">
-            {editable ? (
-              SYMBOLS.map((char) => (
-                <button
-                  key={char}
-                  onMouseDown={keepFocus}
-                  onClick={() => insertTextAtCursor(char)}
-                  className="flex h-9 min-w-[36px] items-center justify-center rounded-md font-mono text-xs font-bold bg-slate-800 text-cyan-400 border border-slate-700/80 active:scale-95 transition-all"
-                >
-                  {char}
-                </button>
-              ))
-            ) : (
-              <span className="text-[11px] font-mono text-slate-500 truncate">
-                {kind} file (sirf dekhne ke liye)
-              </span>
-            )}
+          {/* TOOLS TRAY (slides up above the bar) */}
+          <div
+            className={`absolute inset-x-0 bottom-full z-30 border-t border-slate-800 bg-slate-900 p-2 shadow-[0_-8px_24px_rgba(0,0,0,0.45)] transition-all duration-200 ease-out ${
+              toolsOpen
+                ? 'translate-y-0 opacity-100'
+                : 'pointer-events-none translate-y-3 opacity-0'
+            }`}
+          >
+            <div className="flex gap-2">
+              {editable && (
+                <>
+                  <ToolTile
+                    tone="purple"
+                    label="Undo"
+                    icon={<IconUndo />}
+                    onClick={useTool(handleUndo)}
+                  />
+                  <ToolTile
+                    tone="rose"
+                    label="Clear"
+                    icon={<IconTrash />}
+                    onClick={useTool(handleClearCode)}
+                  />
+                  <ToolTile
+                    tone={screenKeyboard ? 'slate' : 'emerald'}
+                    label={screenKeyboard ? 'Keyboard' : 'Kbd off'}
+                    icon={<IconKeyboard off={!screenKeyboard} />}
+                    onClick={useTool(toggleScreenKeyboard)}
+                  />
+                </>
+              )}
+
+              <ToolTile
+                tone="amber"
+                label="Console"
+                badge={logs.length}
+                icon={<IconTerminal />}
+                onClick={useTool(() => openPanel('console'))}
+              />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0 pl-2 border-l border-slate-800">
-            {editable && (
-              <>
-                <button
-                  onMouseDown={keepFocus}
-                  onClick={handleUndo}
-                  className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-600/20 text-purple-300 border border-purple-500/40 active:scale-95 transition-all"
-                >
-                  ↩️
-                </button>
-
-                <button
-                  onMouseDown={keepFocus}
-                  onClick={handleClearCode}
-                  className="flex h-9 w-9 items-center justify-center rounded-md bg-rose-600/20 text-rose-300 border border-rose-500/40 active:scale-95 transition-all"
-                >
-                  🗑️
-                </button>
-
-                <button
-                  onMouseDown={keepFocus}
-                  onClick={toggleScreenKeyboard}
-                  title={screenKeyboard ? 'Screen keyboard ON' : 'Screen keyboard OFF (physical keyboard)'}
-                  className={`flex h-9 min-w-[36px] items-center justify-center rounded-md border px-1.5 text-xs font-bold active:scale-95 transition-all ${
-                    screenKeyboard
-                      ? 'bg-slate-800 text-slate-300 border-slate-700'
-                      : 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
-                  }`}
-                >
-                  ⌨️{screenKeyboard ? '' : '✕'}
-                </button>
-              </>
-            )}
+          {/* SYMBOL ROW + TOOLS BUTTON */}
+          <div className="flex min-h-[56px] items-center gap-2 px-2">
+            <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none py-1.5">
+              {editable ? (
+                SYMBOLS.map((char) => (
+                  <button
+                    key={char}
+                    onMouseDown={keepFocus}
+                    onClick={() => insertTextAtCursor(char)}
+                    className="flex h-10 min-w-[42px] flex-shrink-0 items-center justify-center rounded-md border border-slate-700/80 bg-slate-800 font-mono text-base font-bold text-cyan-400 active:scale-95 active:bg-slate-700 transition-transform"
+                  >
+                    {char}
+                  </button>
+                ))
+              ) : (
+                <span className="px-1 text-[11px] font-mono text-slate-500 truncate">{kind}</span>
+              )}
+            </div>
 
             <button
-              onClick={() => openPanel('console')}
-              className="flex h-9 items-center gap-1 px-2.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold active:scale-95 transition-all"
+              onMouseDown={keepFocus}
+              onClick={() => setToolsOpen((o) => !o)}
+              title="Tools"
+              className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border active:scale-95 transition-all ${
+                toolsOpen
+                  ? 'border-cyan-500 bg-cyan-500 text-slate-950'
+                  : 'border-slate-700 bg-slate-800 text-slate-300'
+              }`}
             >
-              <span>💻</span>
-              {logs.length > 0 && (
-                <span className="px-1.5 text-[10px] rounded-full bg-amber-400 text-slate-950 font-bold">
-                  {logs.length}
-                </span>
+              {toolsOpen ? <IconChevronDown /> : <IconGrid />}
+              {!toolsOpen && logs.length > 0 && (
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-400" />
               )}
             </button>
           </div>
@@ -339,11 +490,12 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-md border border-slate-800">
                 <button
                   onClick={() => setActiveTab('preview')}
-                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all ${
                     activeTab === 'preview' ? 'bg-cyan-500 text-slate-950 shadow' : 'text-slate-400'
                   }`}
                 >
-                  🌐 Web
+                  <IconGlobe className="h-3.5 w-3.5" />
+                  Web
                 </button>
 
                 <button
@@ -352,7 +504,8 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                     activeTab === 'console' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'
                   }`}
                 >
-                  💻 Console
+                  <IconTerminal className="h-3.5 w-3.5" />
+                  Console
                   {logs.length > 0 && (
                     <span className="px-1.5 rounded-full bg-slate-900 text-amber-400 text-[10px] font-bold">
                       {logs.length}
@@ -363,9 +516,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
 
               <button
                 onClick={() => setShowPreview(false)}
-                className="h-8 px-3 rounded bg-rose-600/20 text-rose-400 font-mono text-xs border border-rose-500/30"
+                className="flex h-8 items-center gap-1.5 px-3 rounded bg-rose-600/20 text-rose-400 font-mono text-xs border border-rose-500/30 active:scale-95"
               >
-                ✕ Close
+                <IconClose className="h-3.5 w-3.5" />
+                Close
               </button>
             </div>
 
@@ -389,9 +543,10 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                   <span>Live Console ({logs.length})</span>
                   <button
                     onClick={() => setLogs([])}
-                    className="px-2 py-1 rounded bg-[#333333] text-[#cccccc] text-[10px]"
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-[#333333] text-[#cccccc] text-[10px] active:bg-[#444444]"
                   >
-                    🚫 Clear
+                    <IconClear className="h-3 w-3" />
+                    Clear
                   </button>
                 </div>
 
@@ -406,8 +561,8 @@ export default function Editor({ activeFile, files, onCodeChange, toggleSidebar 
                           log.level === 'error'
                             ? 'bg-[#291415] text-[#f87171]'
                             : log.level === 'warn'
-                              ? 'bg-[#2a2310] text-[#fbbf24]'
-                              : 'text-[#4ec9b0]'
+                            ? 'bg-[#2a2310] text-[#fbbf24]'
+                            : 'text-[#4ec9b0]'
                         }`}
                       >
                         <span className="text-[#666666] text-[10px]">{log.time}</span>
