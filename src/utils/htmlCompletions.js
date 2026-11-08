@@ -79,7 +79,7 @@ export function setupHtmlCompletions(monaco) {
   if (registered) return;
   registered = true;
 
-  // Built-in HTML suggestions band, hum apne denge (duplicate na ho)
+  
   try {
     monaco.languages.html.htmlDefaults.setModeConfiguration({
       completionItems: false,
@@ -134,10 +134,11 @@ export function setupHtmlCompletions(monaco) {
           sortText: String(i).padStart(3, '0'),
           range
         }));
-        return { suggestions };
+       
+        return { suggestions, incomplete: true };
       }
 
-      // 2) Tag ke andar => attributes
+     
       const lastLt = textBefore.lastIndexOf('<');
       const lastGt = textBefore.lastIndexOf('>');
       if (lastLt > lastGt) {
@@ -157,13 +158,14 @@ export function setupHtmlCompletions(monaco) {
               insertTextRules: R,
               sortText: '0' + label,
               range
-            }))
+            })),
+            incomplete: true
           };
         }
         return { suggestions: [] };
       }
 
-      // 3) "<di" ya sirf "di" => poora tag
+    
       const tagM =
         /<([a-zA-Z][\w-]*)?$/.exec(lineBefore) ||
         /(?:^|[\s>])([a-zA-Z][\w-]*)$/.exec(lineBefore);
@@ -189,7 +191,8 @@ export function setupHtmlCompletions(monaco) {
           filterText: hasLt ? `<${tag}` : tag,
           sortText: '0' + tag,
           range
-        }))
+        })),
+        incomplete: true
       };
     }
   });
