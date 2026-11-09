@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ConsoleValue from './ConsoleValue';
+import ElementsPanel from './ElementsPanel';
 import { CLEAR_COMMAND, makeLog } from '../utils/consoleBridge';
-import { IconPlay, IconClear, IconChevronDown } from './Icons';
+import { IconClear, IconChevronDown } from './Icons';
 
 // Filter chips shown at the top of the console
 const FILTERS = [
@@ -22,8 +23,25 @@ const ROW_STYLES = {
 // Maps any log level to one of the filter categories
 const categoryOf = (level) => (['error', 'warn', 'info'].includes(level) ? level : 'log');
 
-// Keeps focus in the input when a helper button is pressed
+// Keeps focus in the prompt when a helper button is pressed
 const keepFocus = (e) => e.preventDefault();
+
+// Used only to syntax-check the typed code (it is compiled, never run, in this window)
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+// True when the code ends too early (open bracket, string, block...), so Enter should add a new line
+const isIncomplete = (code) => {
+  if (!code.trim()) return false;
+  try {
+    // eslint-disable-next-line no-new
+    new AsyncFunction(code);
+    return false;
+  } catch (err) {
+    return /end of input|end of script|EOF|Unterminated template|missing \) after/i.test(
+      String(err && err.message)
+    );
+  }
+};
 
 const ErrorIcon = () => (
   <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-[#ff5555]" aria-hidden="true">
@@ -49,13 +67,17 @@ const Gutter = ({ level }) => {
 };
 
 /**
- * Real-console style panel: filter chips, log rows with expandable objects,
- * multi-line input with autocomplete, history and an Execute button.
+ * Real-console style panel.
+ * - Console: filter chips, log rows with expandable objects, and an inline prompt
+ *   at the end of the log list (Enter runs, Shift+Enter adds a line, history, autocomplete).
+ * - Elements: DOM tree with a Styles / Computed inspector (see ElementsPanel).
  */
 export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
   const listRef = useRef(null);
   const inputRef = useRef(null);
 
+  const [mode, setMode] = useState('console');
+  const [refreshTick, setRefreshTick] = useState(0);
   const [filter, setFilter] = useState('all');
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -64,8 +86,9 @@ export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
   const historyIndexRef = useRef(0);
   const completeIdRef = useRef(0);
   const completeTimerRef = useRef(null);
+  const lastKeyRef = useRef('');
 
-  // On touch devices Enter adds a new line and the Execute button runs the code
+  // Touch devices get history buttons and a 16px prompt (avoids the iOS focus zoom)
   const isTouch = useMemo(
     () => (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) || false,
     []
@@ -108,11 +131,18 @@ export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
     return out;
   }, [logs, filter]);
 
-  // Keep the list scrolled to the newest row
+  // Keep the list scrolled to the newest row / the prompt
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [rows.length, logs.length, visible]);
+  }, [rows.length, logs.length, visible, mode, input]);
+
+  // On desktop, start typing right away when the console opens
+  useEffect(() => {
+    if (visible && mode === 'console' && !isTouch) {
+      inputRef.current?.focus({ preventScroll: true });
+    }
+  }, [visible, mode, isTouch]);
 
   // Receive autocomplete answers from the iframe
   useEffect(() => {
@@ -182,14 +212,14 @@ export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
   };
 
   /* ---------- Execute ---------- */
-  const execute = () => {
-    const code = input.trim();
+  const run = (raw) => {
+    const code = raw.trim();
+    setInput('');
+    setSuggestions([]);
     if (!code) return;
 
     historyRef.current.push(code);
     historyIndexRef.current = historyRef.current.length;
-    setInput('');
-    setSuggestions([]);
 
     // clear / clear() / console.clear() are handled right here, no round trip needed
     if (CLEAR_COMMAND.test(code)) {
@@ -219,12 +249,18 @@ export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
     historyIndexRef.current = next;
     setInput(history[next] ?? '');
     setSuggestions([]);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isTouch) {
+    lastKeyRef.current = e.key;
+    if (e.nativeEvent.isComposing) return;
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Unfinished code (open bracket, block...) gets a new line, like the real console
+      if (isIncomplete(input)) return;
       e.preventDefault();
-      execute();
+      run(input);
     } else if (e.key === 'Tab' && suggestions.length > 0) {
       e.preventDefault();
       applySuggestion(suggestions[0]);
@@ -237,139 +273,195 @@ export default function ConsolePanel({ visible, iframeRef, logs, setLogs }) {
     }
   };
 
+  const handleChange = (e) => {
+    const value = e.target.value;
+
+    // Some mobile keyboards send no usable keydown for Enter, so catch the line break here
+    if (e.nativeEvent.inputType === 'insertLineBreak' && lastKeyRef.current !== 'Enter') {
+      const code = value.replace(/\n$/, '');
+      if (value.endsWith('\n') && !isIncomplete(code)) {
+        run(code);
+        return;
+      }
+    }
+
+    setInput(value);
+    requestSuggestions(value, e.target.selectionStart);
+  };
+
+  // Tapping the empty space under the logs focuses the prompt
+  const focusPrompt = () => {
+    if (window.getSelection && String(window.getSelection())) return;
+    inputRef.current?.focus();
+  };
+
+  const isConsole = mode === 'console';
+
   return (
     <div
       className={`h-full w-full flex-col bg-[#1e1e1e] font-mono text-xs text-[#d4d4d4] ${visible ? 'flex' : 'hidden'
         }`}
     >
-      {/* FILTER BAR */}
+      {/* TOP BAR: mode switch, filter chips, actions */}
       <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-[#333333] bg-[#252526] px-2 py-1.5">
-        <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
-          {FILTERS.map(({ id, label }) => {
-            const count = counts[id] || 0;
-            return (
-              <button
-                key={id}
-                onClick={() => setFilter(id)}
-                className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] ${filter === id
-                    ? 'border-[#5ab0ff] bg-[#5ab0ff]/20 text-[#9cd0ff]'
-                    : 'border-[#3c3c3c] bg-[#2d2d2d] text-[#bbbbbb]'
-                  }`}
-              >
-                {label}
-                {count > 0 && (
-                  <span className={id === 'error' ? 'text-[#ff8080]' : 'text-[#f4bd00]'}>{count}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          onClick={() => setLogs([])}
-          title="Clear console"
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
-        >
-          <IconClear className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* LOG LIST */}
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
-        {rows.length === 0 ? (
-          <div className="p-4 text-center italic text-[#666666]">Console is empty.</div>
-        ) : (
-          rows.map((row) => (
-            <div
-              key={row.id}
-              className={`flex items-start gap-1.5 border-b px-2 py-1 leading-relaxed ${ROW_STYLES[row.level] || ROW_STYLES.default
+        <div className="flex flex-shrink-0 items-center rounded-md border border-[#3c3c3c] bg-[#1e1e1e] p-0.5">
+          {['console', 'elements'].map((id) => (
+            <button
+              key={id}
+              onClick={() => setMode(id)}
+              className={`rounded px-2.5 py-1 text-[11px] font-semibold capitalize ${mode === id ? 'bg-[#5ab0ff] text-slate-950' : 'text-[#bbbbbb]'
                 }`}
             >
-              <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
-                <Gutter level={row.level} />
-              </span>
-
-              {row.count > 1 && (
-                <span className="mt-0.5 flex-shrink-0 rounded-full bg-[#3c3c3c] px-1.5 text-[10px] leading-4 text-[#cccccc]">
-                  {row.count}
-                </span>
-              )}
-
-              <div className="min-w-0 flex-1">
-                {row.value ? (
-                  <ConsoleValue node={row.value} />
-                ) : (
-                  <pre className="whitespace-pre-wrap break-all font-mono text-xs">{row.message}</pre>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* AUTOCOMPLETE SUGGESTIONS */}
-      {suggestions.length > 0 && (
-        <div className="flex flex-shrink-0 items-center gap-1.5 overflow-x-auto scrollbar-none border-t border-[#333333] bg-[#252526] px-2 py-1.5">
-          {suggestions.map((name) => (
-            <button
-              key={name}
-              onMouseDown={keepFocus}
-              onClick={() => applySuggestion(name)}
-              className="flex-shrink-0 rounded bg-[#333333] px-2 py-1 text-[12px] text-[#9cdcfe] active:bg-[#444444]"
-            >
-              {name}
+              {id}
             </button>
           ))}
         </div>
-      )}
 
-      {/* INPUT ROW */}
-      <div className="flex flex-shrink-0 items-end gap-1.5 border-t border-[#333333] bg-[#252526] px-2 py-1.5">
-        <span className="pb-2 font-bold text-[#5ab0ff]">{'>'}</span>
+        {isConsole ? (
+          <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
+            {FILTERS.map(({ id, label }) => {
+              const count = counts[id] || 0;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setFilter(id)}
+                  className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] ${filter === id
+                      ? 'border-[#5ab0ff] bg-[#5ab0ff]/20 text-[#9cd0ff]'
+                      : 'border-[#3c3c3c] bg-[#2d2d2d] text-[#bbbbbb]'
+                    }`}
+                >
+                  {label}
+                  {count > 0 && (
+                    <span className={id === 'error' ? 'text-[#ff8080]' : 'text-[#f4bd00]'}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
 
-        <textarea
-          ref={inputRef}
-          value={input}
-          rows={Math.min(5, Math.max(1, input.split('\n').length))}
-          onChange={(e) => {
-            setInput(e.target.value);
-            requestSuggestions(e.target.value, e.target.selectionStart);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Type JavaScript..."
-          autoCapitalize="off"
-          autoCorrect="off"
-          autoComplete="off"
-          spellCheck={false}
-          className="min-h-[36px] min-w-0 flex-1 resize-none rounded border border-[#3c3c3c] bg-[#1e1e1e] px-2 py-1.5 font-mono text-[16px] leading-5 text-[#d4d4d4] outline-none placeholder:text-[#666666] focus:border-[#5ab0ff]"
-        />
+        {isConsole && isTouch && (
+          <>
+            <button
+              onMouseDown={keepFocus}
+              onClick={() => browseHistory(-1)}
+              title="Previous command"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
+            >
+              <IconChevronDown className="h-4 w-4 rotate-180" />
+            </button>
+            <button
+              onMouseDown={keepFocus}
+              onClick={() => browseHistory(1)}
+              title="Next command"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
+            >
+              <IconChevronDown className="h-4 w-4" />
+            </button>
+          </>
+        )}
 
-        <button
-          onMouseDown={keepFocus}
-          onClick={() => browseHistory(-1)}
-          title="Previous command"
-          className="flex h-9 w-8 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
-        >
-          <IconChevronDown className="h-4 w-4 rotate-180" />
-        </button>
-        <button
-          onMouseDown={keepFocus}
-          onClick={() => browseHistory(1)}
-          title="Next command"
-          className="flex h-9 w-8 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
-        >
-          <IconChevronDown className="h-4 w-4" />
-        </button>
-        <button
-          onMouseDown={keepFocus}
-          onClick={execute}
-          title="Execute"
-          className="flex h-9 flex-shrink-0 items-center gap-1 rounded bg-green-400 px-3 text-xs font-bold text-slate-950 active:scale-95"
-        >
-          <IconPlay className="h-3 w-3" />
-          Execute
-        </button>
+        {isConsole ? (
+          <button
+            onClick={() => setLogs([])}
+            title="Clear console"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-[#cccccc] active:bg-[#444444]"
+          >
+            <IconClear className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            onClick={() => setRefreshTick((t) => t + 1)}
+            title="Refresh elements"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#333333] text-base text-[#cccccc] active:bg-[#444444]"
+          >
+            {'\u21BB'}
+          </button>
+        )}
       </div>
+
+      {/* CONSOLE (stays mounted so input, history and filters are kept) */}
+      <div className={`min-h-0 flex-1 flex-col ${isConsole ? 'flex' : 'hidden'}`}>
+        {/* LOG LIST + inline prompt */}
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex min-h-full flex-col">
+            {rows.map((row) => (
+              <div
+                key={row.id}
+                className={`flex items-start gap-1.5 border-b px-2 py-1 leading-relaxed ${ROW_STYLES[row.level] || ROW_STYLES.default
+                  }`}
+              >
+                <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                  <Gutter level={row.level} />
+                </span>
+
+                {row.count > 1 && (
+                  <span className="mt-0.5 flex-shrink-0 rounded-full bg-[#3c3c3c] px-1.5 text-[10px] leading-4 text-[#cccccc]">
+                    {row.count}
+                  </span>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  {row.value ? (
+                    <ConsoleValue node={row.value} />
+                  ) : (
+                    <pre className="whitespace-pre-wrap break-all font-mono text-xs">{row.message}</pre>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* PROMPT (last line of the console, like Chrome DevTools) */}
+            <div className="flex items-start gap-1.5 px-2 py-1">
+              <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center pt-0.5 font-bold text-[#5ab0ff]">
+                {'>'}
+              </span>
+              <textarea
+                ref={inputRef}
+                value={input}
+                rows={Math.min(8, Math.max(1, input.split('\n').length))}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type JavaScript..."
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                style={{ fontSize: isTouch ? 16 : 12, lineHeight: isTouch ? '22px' : '19.5px' }}
+                className="block min-w-0 flex-1 resize-none bg-transparent p-0 font-mono text-[#d4d4d4] outline-none placeholder:text-[#555555]"
+              />
+            </div>
+
+            <div className="min-h-[24px] flex-1" onClick={focusPrompt} />
+          </div>
+        </div>
+
+        {/* AUTOCOMPLETE SUGGESTIONS (only visible while there are matches) */}
+        {suggestions.length > 0 && (
+          <div className="flex flex-shrink-0 items-center gap-1.5 overflow-x-auto scrollbar-none border-t border-[#333333] bg-[#252526] px-2 py-1.5">
+            {suggestions.map((name) => (
+              <button
+                key={name}
+                onMouseDown={keepFocus}
+                onClick={() => applySuggestion(name)}
+                className="flex-shrink-0 rounded bg-[#333333] px-2 py-1 text-[12px] text-[#9cdcfe] active:bg-[#444444]"
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ELEMENTS INSPECTOR */}
+      <ElementsPanel
+        active={visible && mode === 'elements'}
+        iframeRef={iframeRef}
+        refreshTick={refreshTick}
+      />
     </div>
   );
 }

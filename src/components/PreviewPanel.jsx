@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ConsolePanel from './ConsolePanel';
 import { compilePreview } from '../utils/compilePreview';
 import { injectBridge, makeLog } from '../utils/consoleBridge';
+import { getPageMeta } from '../utils/pageMeta';
 import {
   IconTerminal,
   IconGlobe,
@@ -37,8 +38,32 @@ const clampSize = (value, fallback) => {
   return Math.min(4000, Math.max(100, n));
 };
 
+// Shows the page favicon, falls back to a globe icon if it is missing or broken
+const Favicon = ({ src }) => {
+  const [failed, setFailed] = useState(false);
+
+  // Reset the error state whenever the favicon source changes
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) {
+    return <IconGlobe className="h-4 w-4 flex-shrink-0 text-slate-400" />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="h-4 w-4 flex-shrink-0 rounded-sm object-contain"
+    />
+  );
+};
+
 /**
- * Full-screen preview overlay: Web tab (with responsive device toolbar) and Console tab.
+ * Full-screen preview overlay: Web tab (with browser-like bar and responsive device toolbar)
+ * and Console tab.
  * Logs live in the parent so the tools tray can show a badge.
  */
 export default function PreviewPanel({
@@ -64,6 +89,12 @@ export default function PreviewPanel({
     () => injectBridge(compilePreview(activeFile, files)),
     [activeFile, files]
   );
+
+  // Title and favicon shown in the browser-like bar
+  const pageMeta = useMemo(() => getPageMeta(previewCode, files), [previewCode, files]);
+
+  // Fake address shown in the bar (the preview actually runs inside a srcDoc iframe)
+  const addressText = `localhost/${(activeFile?.path || 'index.html').replace(/^\//, '')}`;
 
   // Collect console logs (and command results) coming from the preview iframe
   useEffect(() => {
@@ -170,8 +201,23 @@ export default function PreviewPanel({
       </div>
 
       <div className="flex-1 min-h-0 w-full relative overflow-hidden bg-black">
-        {/* WEB TAB: responsive toolbar + preview stage */}
+        {/* WEB TAB: browser-like bar + responsive toolbar + preview stage */}
         <div className={`h-full w-full flex-col ${activeTab === 'preview' ? 'flex' : 'hidden'}`}>
+          {/* Browser-like bar: favicon, title and URL */}
+          <div className="flex-shrink-0 border-b border-slate-800 bg-slate-900 px-2 py-1.5 select-none">
+            <div className="flex min-w-0 items-center gap-2">
+              <Favicon src={pageMeta.favicon} />
+              <span className="truncate text-xs font-semibold text-slate-200">
+                {pageMeta.title}
+              </span>
+            </div>
+
+            <div className="mt-1.5 flex h-7 min-w-0 items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950 px-3">
+              <IconGlobe className="h-3.5 w-3.5 flex-shrink-0 text-emerald-400" />
+              <span className="truncate font-mono text-[11px] text-slate-400">{addressText}</span>
+            </div>
+          </div>
+
           {/* Responsive (device) toolbar */}
           <div className="flex h-10 flex-shrink-0 items-center gap-1.5 overflow-x-auto scrollbar-none border-b border-slate-800 bg-slate-900 px-2 select-none">
             {DEVICE_BUTTONS.map(({ id, label, Icon: DeviceIcon }) => (

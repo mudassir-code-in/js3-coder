@@ -3,6 +3,7 @@
    eval inside it. The function below is stringified and injected into the preview
    HTML. It receives commands via postMessage, runs them in the iframe's global scope
    and replies with structured values so the console can show expandable objects.
+   It also powers the Elements inspector (DOM tree, styles).
    NOTE: it must stay self-contained (no references to variables outside the function). */
 function consoleBridge() {
   var MAX_DEPTH = 4;
@@ -199,6 +200,208 @@ function consoleBridge() {
     );
   }
 
+  /* ---------- Elements inspector ---------- */
+  var nodeList = []; // id -> DOM node
+  var nodeIds = new WeakMap(); // DOM node -> id
+  var lastRules = []; // CSS rules matched for the last inspected element (editable)
+
+  // Gives every DOM node a small numeric id the parent can refer to
+  function idOf(node) {
+    var id = nodeIds.get(node);
+    if (id === undefined) {
+      id = nodeList.length;
+      nodeList.push(node);
+      nodeIds.set(node, id);
+    }
+    return id;
+  }
+
+  function clip(text, max) {
+    return text.length > max ? text.slice(0, max) + '\u2026' : text;
+  }
+
+  // The injected bridge script itself is hidden from the tree
+  function isBridgeNode(n) {
+    return n.nodeType === 1 && n.hasAttribute('data-devtools-bridge');
+  }
+
+  // Elements, comments and non-empty text nodes
+  function visibleChildren(el) {
+    return Array.prototype.filter.call(el.childNodes, function (c) {
+      if (c.nodeType === 1) return !isBridgeNode(c);
+      if (c.nodeType === 3) return c.nodeValue.trim() !== '';
+      return c.nodeType === 8;
+    });
+  }
+
+  // Plain description of a DOM node for the tree
+  function describeNode(n) {
+    var d = { id: idOf(n), type: n.nodeType };
+    if (n.nodeType === 1) {
+      d.tag = n.tagName.toLowerCase();
+      d.attrs = [];
+      for (var i = 0; i < n.attributes.length; i++) {
+        d.attrs.push({ k: n.attributes[i].name, v: clip(n.attributes[i].value, 120) });
+      }
+      d.childCount = visibleChildren(n).length;
+    } else {
+      d.text = clip(n.nodeValue.trim().replace(/\s+/g, ' '), 200);
+    }
+    return d;
+  }
+
+  // id -1 means "the document", which returns the <html> element
+  function sendChildren(data) {
+    var nodes = [];
+    try {
+      var list = [];
+      if (data.id === -1) {
+        list = [document.documentElement];
+      } else {
+        var el = nodeList[data.id];
+        list = el ? visibleChildren(el) : [];
+      }
+      nodes = list.map(describeNode);
+    } catch (e) {}
+    parent.postMessage({ type: 'DEVTOOLS_DOM_CHILDREN_RESULT', id: data.id, nodes: nodes }, '*');
+  }
+
+  // Splits a cssText string into declarations (handles ";" inside url(...) and quotes)
+  function parseDeclarations(text) {
+    var out = [];
+    var cur = '';
+    var depth = 0;
+    var quote = '';
+
+    function push(part) {
+      var idx = part.indexOf(':');
+      if (idx > 0) out.push({ name: part.slice(0, idx).trim(), value: part.slice(idx + 1).trim() });
+    }
+
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charAt(i);
+      if (quote) {
+        if (ch === quote && text.charAt(i - 1) !== '\\') quote = '';
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth = Math.max(0, depth - 1);
+      }
+
+      if (ch === ';' && !quote && depth === 0) {
+        push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    push(cur);
+    return out;
+  }
+
+  // Short name of the stylesheet a rule comes from
+  function sourceOf(sheet) {
+    if (sheet.href) return sheet.href.split('/').pop() || sheet.href;
+    var owner = sheet.ownerNode;
+    return owner && owner.tagName ? '<' + owner.tagName.toLowerCase() + '>' : 'stylesheet';
+  }
+
+  // Collects every CSS rule that matches the element (walks into @media / @supports)
+  function collectRules(list, el, out, scope, source) {
+    for (var i = 0; i < list.length; i++) {
+      var rule = list[i];
+      try {
+        if (rule.selectorText !== undefined && rule.style) {
+          if (el.matches(rule.selectorText)) out.push({ rule: rule, scope: scope, source: source });
+        } else if (rule.cssRules) {
+          var nextScope = scope;
+          if (rule.media) {
+            if (!window.matchMedia(rule.media.mediaText).matches) continue;
+            nextScope = '@media ' + rule.media.mediaText;
+          }
+          collectRules(rule.cssRules, el, out, nextScope, source);
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Sends inline style, matched rules and computed style of one element
+  function sendStyles(id) {
+    var el = nodeList[id];
+    if (!el || el.nodeType !== 1) return;
+
+    window.$0 = el;
+
+    var found = [];
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var sheet = document.styleSheets[s];
+      try {
+        collectRules(sheet.cssRules, el, found, '', sourceOf(sheet));
+      } catch (e) {} // cross-origin sheets cannot be read
+    }
+
+    lastRules = found.map(function (f) { return f.rule; });
+
+    // Later rules win, so show them first (like DevTools)
+    var rules = found
+      .map(function (f, i) {
+        return {
+          index: i,
+          selector: f.rule.selectorText,
+          scope: f.scope,
+          source: f.source,
+          props: parseDeclarations(f.rule.style.cssText)
+        };
+      })
+      .reverse();
+
+    var cs = getComputedStyle(el);
+    var computed = [];
+    for (var c = 0; c < cs.length; c++) {
+      computed.push([cs[c], cs.getPropertyValue(cs[c])]);
+    }
+
+    parent.postMessage(
+      {
+        type: 'DEVTOOLS_STYLE_RESULT',
+        id: id,
+        inline: parseDeclarations(el.style.cssText),
+        rules: rules,
+        computed: computed
+      },
+      '*'
+    );
+  }
+
+  // Edits one declaration: rename (oldName -> name), change value, or remove (empty value)
+  function setStyle(data) {
+    var el = nodeList[data.id];
+    if (!el) return;
+
+    try {
+      var style = data.target === 'inline' ? el.style : lastRules[data.target] && lastRules[data.target].style;
+      if (style) {
+        var name = (data.name || '').trim();
+        var value = (data.value || '').trim();
+
+        if (data.oldName && data.oldName !== name) style.removeProperty(data.oldName);
+
+        if (name) {
+          if (!value) {
+            style.removeProperty(name);
+          } else {
+            var important = /\s*!important\s*$/i.test(value);
+            style.setProperty(name, value.replace(/\s*!important\s*$/i, ''), important ? 'important' : '');
+          }
+        }
+      }
+    } catch (e) {}
+
+    sendStyles(data.id);
+  }
+
   // DevTools-style helpers
   window.clear = function () { send('clear', ''); };
   console.clear = function () { send('clear', ''); };
@@ -220,6 +423,21 @@ function consoleBridge() {
       return;
     }
 
+    if (data.type === 'DEVTOOLS_DOM_CHILDREN') {
+      sendChildren(data);
+      return;
+    }
+
+    if (data.type === 'DEVTOOLS_STYLE_GET') {
+      sendStyles(data.id);
+      return;
+    }
+
+    if (data.type === 'DEVTOOLS_STYLE_SET') {
+      setStyle(data);
+      return;
+    }
+
     if (data.type !== 'DEVTOOLS_EXEC') return;
 
     try {
@@ -234,10 +452,14 @@ function consoleBridge() {
       reportError(err, 'Uncaught ');
     }
   });
+
+  // Tells the editor that a fresh page has loaded (the Elements tree must reset)
+  parent.postMessage({ type: 'DEVTOOLS_READY' }, '*');
 }
 
 // Full <script> tag that runs the bridge inside the preview
-const BRIDGE_SCRIPT = '<script>(' + consoleBridge.toString() + ')();<' + '/script>';
+const BRIDGE_SCRIPT =
+  '<script data-devtools-bridge>(' + consoleBridge.toString() + ')();<' + '/script>';
 
 // Injects the bridge right before the last </body> (or at the end if there is none)
 export const injectBridge = (html) => {
